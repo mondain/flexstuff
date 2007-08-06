@@ -1,0 +1,200 @@
+<?xml version="1.0"?>
+<project name="census" default="help">
+
+  <property environment="env"/>
+  <property name="jboss.home"        value="${env.JBOSS_HOME}"/>
+  <property name="fds.home"          value="${env.FDS_HOME}"/>
+  <property name="flex.war"          value="${fds.home}/flex.war"/>
+  <property name="flex.sdk.dir"      value="${fds.home}/flex_sdk_2"/>
+  <property name="src.java.dir"      value="src/java"/>
+  <property name="src.flex.dir"      value="src/flex"/>
+  <property name="src.census.dir"    value="src/census.war"/>
+  <property file="${fds.home}/license.properties"/>
+
+  <macrodef name="compileflex">
+    <attribute name="src"/>
+    <attribute name="dest"/>
+    <element name="uptodatefiles" optional="true"/>
+    <sequential>
+      <uptodate property="@{src}.uptodate" targetfile="@{dest}">
+        <srcfiles file="@{src}"/>
+        <srcfiles file="build/base.swc"/>
+        <srcfiles file="${src.flex.dir}/flex.css"/>
+        <uptodatefiles/>
+      </uptodate>
+      <antcall target="compilemxml">
+        <param name="src" value="@{src}"/>
+        <param name="dest" value="@{dest}"/>
+      </antcall>
+    </sequential>
+  </macrodef>
+
+  <target name="compilemxml" unless="${src}.uptodate">
+    <java jar="${flex.sdk.dir}/lib/mxmlc.jar" fork="true" maxmemory="128m">
+      <jvmarg value="-Dapplication.home=${flex.sdk.dir}"/>
+      <arg value="-external-library-path+=build/base.swc"/>
+      <arg value="-runtime-shared-libraries=base.swf"/>
+      <arg value="-licenses.license" />
+      <arg value="charting"/>
+      <arg value="${charting}"/>
+      <arg value="-compiler.services" />
+      <arg value="etc/flex/services-config.xml" />
+      <arg value="-compiler.context-root" />
+      <arg value="/census" />
+      <arg value="-file-specs" />
+      <arg value="${src}" />
+      <arg value="-output" />
+      <arg value="${dest}" />
+    </java>  
+  </target>
+
+  <target name="compilersl" unless="rsluptodate">
+    <java jar="${flex.sdk.dir}/lib/compc.jar" fork="true" maxmemory="128m">
+      <jvmarg value="-Dapplication.home=${flex.sdk.dir}"/>
+      <arg value="-debug=false" />
+      <arg value="-o=build/base.swc" />
+      <arg value="-source-path+=${src.flex.dir}" />
+      <arg value="BaseRSL"/>
+    </java>
+
+    <java jar="${flex.sdk.dir}/lib/mxmlc.jar" fork="true" maxmemory="128m">
+      <jvmarg value="-Dapplication.home=${flex.sdk.dir}"/>
+      <arg value="-debug=false" />
+      <arg value="-o=build/census.war/base.swf" />
+      <arg value="-source-path+=${src.flex.dir}" />
+      <arg value="-file-specs=${src.flex.dir}/BaseRSL.as"/>
+    </java>
+  </target>
+
+  <target name="prepare">
+
+    <tstamp/>
+
+    <fail message="Please set JBOSS_HOME to your JBoss 4.0.4GA dir">
+      <condition>
+        <not>
+          <available file="${jboss.home}" type="dir"/>
+        </not>
+      </condition>
+    </fail>
+
+    <fail message="Please set FDS_HOME to a vanilla Flex Data Services install dir.">
+      <condition>
+        <not>
+          <available file="${flex.war}" type="file"/>
+        </not>
+      </condition>
+    </fail>
+
+    <mkdir dir="build"/>
+  </target>
+
+  <target name="build-war" depends="prepare">
+
+    <unjar src="${flex.war}" dest="build/census.war" overwrite="false"/>
+
+    <delete file="build/census.war/index.htm"/>
+
+    <mkdir dir="build/census.war/WEB-INF/lib"/>
+    <mkdir dir="build/census.war/WEB-INF/classes"/>
+    <javac srcdir="${src.java.dir}" destdir="build/census.war/WEB-INF/classes"
+      classpath="${jboss.home}/client/javax.servlet.jar:build/census.war/WEB-INF/lib/flex-messaging.jar:lib/json-lib-1.0-jdk15.jar"/>
+
+    <copy todir="build/census.war" preservelastmodified="true">
+      <fileset dir="${src.census.dir}"/>
+    </copy>
+
+    <copy file="etc/flex/data-management-config.xml"
+      todir="build/census.war/WEB-INF/flex" preservelastmodified="true"/>
+    <copy file="etc/flex/remoting-config.xml"
+      todir="build/census.war/WEB-INF/flex" preservelastmodified="true"/>
+    <copy file="etc/flex/services-config.xml"
+      todir="build/census.war/WEB-INF/flex" preservelastmodified="true"/>
+    <copy file="etc/flex/messaging-config.xml"
+      todir="build/census.war/WEB-INF/flex" preservelastmodified="true"/>
+    <copy file="${fds.home}/license.properties"
+      todir="build/census.war/WEB-INF/flex" preservelastmodified="true"/>
+    <copy file="etc/web/server-config.wsdd"
+      todir="build/census.war/WEB-INF" preservelastmodified="true"/>
+
+    <copy file="etc/web/web.xml"
+      todir="build/census.war/WEB-INF" preservelastmodified="true"/>
+
+    <copy file="lib/axis.jar"
+      todir="build/census.war/WEB-INF/lib" preservelastmodified="true"/>
+    <copy file="lib/commons-discovery-0.2.jar"
+      todir="build/census.war/WEB-INF/lib" preservelastmodified="true"/>
+    <copy file="lib/json-lib-1.0-jdk15.jar"
+      todir="build/census.war/WEB-INF/lib" preservelastmodified="true"/>
+    <copy file="lib/commons-lang-2.3.jar"
+      todir="build/census.war/WEB-INF/lib" preservelastmodified="true"/>
+    <copy file="lib/ezmorph-1.0.1.jar"
+      todir="build/census.war/WEB-INF/lib" preservelastmodified="true"/>
+
+    <copy file="lib/hsqldb.jar"
+      todir="build/census.war/WEB-INF/lib" preservelastmodified="true"/>
+    <mkdir dir="build/census.war/WEB-INF/db"/>
+    <copy todir="build/census.war/WEB-INF/db" preservelastmodified="true">
+      <fileset dir="etc/db"/>
+    </copy>
+
+    <uptodate property="rsluptodate" targetfile="build/base.swc"
+      srcfile="${src.flex.dir}/BaseRSL.as"/>
+
+    <antcall target="compilersl"/>
+
+    <compileflex src="${src.flex.dir}/flex_xml_as.mxml" dest="build/census.war/flex_xml_as.swf"/>
+
+    <compileflex src="${src.flex.dir}/flex_xml_e4x.mxml" dest="build/census.war/flex_xml_e4x.swf"/>
+
+    <!--
+    <compileflex src="${src.flex.dir}/flex_json.mxml" dest="build/census.war/flex_json.swf"/>
+    -->
+
+    <compileflex src="${src.flex.dir}/flex_soap_as.mxml" dest="build/census.war/flex_soap_as.swf"/>
+
+    <compileflex src="${src.flex.dir}/flex_soap_e4x.mxml" dest="build/census.war/flex_soap_e4x.swf"/>
+
+    <compileflex src="${src.flex.dir}/flex_amf0.mxml" dest="build/census.war/flex_amf0.swf"/>
+	  
+    <compileflex src="${src.flex.dir}/flex_amf3.mxml" dest="build/census.war/flex_amf3.swf"/>
+
+    <compileflex src="${src.flex.dir}/flex_paged.mxml" dest="build/census.war/flex_paged.swf"/>
+
+    <compileflex src="${src.flex.dir}/testDone.mxml" dest="build/census.war/testDone.swf"/>
+
+    <compileflex src="${src.flex.dir}/index.mxml" dest="build/census.war/index.swf">
+      <uptodatefiles>
+        <srcfiles file="${src.flex.dir}/Test.as"/>
+        <srcfiles dir="${src.flex.dir}" includes="Wizard*"/>
+        <srcfiles file="${src.flex.dir}/IFrame.mxml"/>
+        <srcfiles file="${src.flex.dir}/BarItemRenderer.as"/>
+        <srcfiles file="${src.flex.dir}/ChartBackgroundFill.as"/>
+        <srcfiles file="${src.flex.dir}/ChartLegendCombo.mxml"/>
+        <srcfiles file="${src.flex.dir}/CustomAxisRenderer.mxml"/>
+        <srcfiles file="${src.flex.dir}/DataGridHeaderSeparator.as"/>
+      </uptodatefiles>
+    </compileflex>
+
+  </target>
+
+  <target name="deploy-war" depends="build-war">
+    <copy todir="${jboss.home}/server/census/deploy">
+      <fileset dir="build" excludes="base.swc"/>
+    </copy>
+    <!--<touch file="${jboss.home}/server/census/deploy/census.war/WEB-INF/web.xml"/>-->
+  </target>
+
+  <target name="clean">
+    <delete dir="build"/>
+  </target>
+
+  <target name="help">
+    <echo>
+      Set JBOSS_HOME to your JBoss 4.0.4GA dir
+      Set FDS_HOME to a vanilla Fles Data Services install
+      Run ant deploy-war
+    </echo>
+  </target>
+
+</project>
