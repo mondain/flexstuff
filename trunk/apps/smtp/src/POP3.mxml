@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute"
+	creationComplete="initApp()">
+<!--
+
+	    EXAMPLE: POP3 Protocol Example
+	    AUTHOR: Simon Barber
+	    CREATED: Nov. 21, 2005
+	    MODIFIED: Nov. 21, 2005
+
+	    Macromedia® Flex® by Example
+	    http://www.ifbin.com
+
+-->
+	<mx:Script>
+		<![CDATA[
+
+			import flash.events.*;
+			import flash.net.Socket;
+			import flash.util.ByteArray;
+
+			import mx.managers.PopUpManager;
+			import mx.containers.TitleWindow;
+
+			internal var socket:Socket;
+			internal var POP3Server:String;
+			internal var port:uint = 110;
+
+			[Bindable]
+			public var connected:Boolean = false;
+
+			// When application has been initiated this function gets called
+			internal function initApp():Void
+			{
+				// Create an instance of flash.net.Socket
+				socket = new Socket();
+
+				// Initialise listeners
+				socket.addEventListener( "connect" , connectEvent , false , 0 );
+				socket.addEventListener( "close" , closeEvent , false, 0 );
+				socket.addEventListener( "ioError" , ioErrorEvent , false, 0 );
+				socket.addEventListener( "securityError" , securityErrorEvent , false, 0 );
+				socket.addEventListener( "socketData" , socketDataEvent , false , 0 );
+			}
+
+			internal function connect():Void
+			{
+				// Assign POP3 server from text input
+				POP3Server = pop3Server.text;
+
+				// Connect to server and specify port number
+				socket.connect(POP3Server, port);
+
+				// Create an instance of flash.utils.ByteArray
+				var authentication:ByteArray = new ByteArray();
+
+				// Write UTF string user and pass to ByteArray and terminate with \r\n
+				authentication.writeUTFBytes("user " + pop3User.text + "\r\n");
+				authentication.writeUTFBytes("pass " + pop3Password.text + "\r\n");
+
+				// Write ByteArray to socket
+				socket.writeBytes(authentication);
+
+				// Flushes any accumulated data in the socket's output buffer and sends it to the server
+				socket.flush();
+			}
+
+			internal function disconnect():Void
+			{
+				// If connected then disconnect and close the socket
+				if (socket.connected) socket.close();
+				connected = false;
+				serverResults.text += "Disconnected";
+			}
+
+			internal function sendMessage():Void
+			{
+				// Concat the string Client: to every client message sent to the server
+				serverResults.text += "Client:" + pop3Messages.text + "\n";
+
+				if (pop3Messages.text != "")
+				{
+					// Write UTF string from the text input and send it to the server
+					var message:ByteArray = new ByteArray();
+					message.writeUTFBytes(pop3Messages.text + "\r\n");
+					socket.writeBytes(message);
+					socket.flush();
+				}
+
+				// If the word QUIT is sent to the server then disconnect
+				if (pop3Messages.text.indexOf("quit") != -1)
+				{
+					if (connected == true)
+						disconnect();
+				}
+			}
+
+			internal function statCommand():Void
+			{
+				pop3Messages.text = "stat";
+
+				/*var stat:ByteArray = new ByteArray();
+				stat.writeUTFBytes("stat\r\n");
+				socket.writeBytes(stat);
+				socket.flush();*/
+			}
+
+			internal function retrCommand():Void
+			{
+				pop3Messages.text = "retr";
+
+				/*var retr:ByteArray = new ByteArray();
+				retr.writeUTFBytes("retr\r\n");
+				socket.writeBytes(retr);
+				socket.flush();*/
+			}
+
+			internal function deleCommand():Void
+			{
+				pop3Messages.text = "dele";
+
+				/*var dele:ByteArray = new ByteArray();
+				dele.writeUTFBytes("dele\r\n");
+				socket.writeBytes(dele);
+				socket.flush();*/
+			}
+
+			internal function copyToClipboard():Void
+			{
+				// Copy contents of Text Area to the Clipboard
+				flash.system.System.setClipboard(serverResults.text);
+			}
+
+			// Event Handlers for Socket
+
+			internal function connectEvent(event:Event):Void
+			{
+				trace(event.type);
+			}
+
+			internal function closeEvent(event:Event):Void
+			{
+				trace(event.type);
+			}
+
+			internal function ioErrorEvent(event:Event):Void
+			{
+				mx.controls.Alert(event.type);
+			}
+
+			internal function securityErrorEvent(event:Event):Void
+			{
+				mx.controls.Alert(event.type);
+			}
+
+			internal function socketDataEvent(event:Event):Void
+			{
+				trace(event.type);
+
+				trace("bytes available: " + socket.bytesAvailable);
+
+				// Check to see if the socket has bytes in the stream
+				while (socket.bytesAvailable)
+				{
+					var msg:String = socket.readUTFBytes(socket.bytesAvailable);
+
+					if (msg.indexOf("+OK") != -1)
+					{
+						serverResults.text += "Server: " + msg;
+						connected = true;
+					}
+					else if(msg.indexOf("-ERR") != -1)
+					{
+						serverResults.text += "Server Error: " + msg;
+					}
+					else
+					{
+						serverResults.text += msg;
+					}
+				}
+			}
+
+		]]>
+	</mx:Script>
+
+	<mx:Panel width="450" height="486">
+		<mx:Label text="POP3 Socket Example"/>
+		<mx:VBox>
+			<mx:Form>
+				<mx:FormItem label="POP3 Server">
+					<mx:TextInput id="pop3Server" width="250" />
+				</mx:FormItem>
+				<mx:FormItem label="POP3 User">
+					<mx:TextInput id="pop3User" width="250" />
+				</mx:FormItem>
+				<mx:FormItem label="POP3 Password">
+					<mx:TextInput id="pop3Password" password="true" width="250" />
+				</mx:FormItem>
+				<mx:FormItem direction="horizontal">
+					<mx:Button label="Connect" click="connect()" enabled="{!connected}" />
+					<mx:Button label="Disconnect" click="disconnect()" enabled="{connected}" />
+				</mx:FormItem>
+				<mx:FormItem label="POP3 Messages">
+					<mx:TextInput id="pop3Messages" width="250" enabled="{connected}" />
+				</mx:FormItem>
+				<mx:FormItem>
+					<mx:Button label="Send" click="sendMessage()" enabled="{connected}" />
+				</mx:FormItem>
+				<mx:FormItem label="POP3 Commands" direction="horizontal">
+					<mx:Button label="STAT" click="statCommand()" enabled="{connected}"
+						toolTip="Usage: STAT Returns: STAT command returns a string +OK 0 (number of messages on the server) 0 (size in bytes of all messages)" />
+					<mx:Button label="RETR" click="retrCommand()" enabled="{connected}"
+						toolTip="Usage: RETR n (Number of message to retrieve) Returns: a list of all the messages" />
+					<mx:Button label="DELE" click="deleCommand()" enabled="{connected}"
+						toolTip="Usage: DELE n (amount of messages to delete) Returns: +OK n (amount of deleted messages) Messages have been deleted" />
+				</mx:FormItem>
+				<mx:FormItem label="POP3 Server Results">
+					<mx:TextArea id="serverResults" width="250" height="150" />
+				</mx:FormItem>
+				<mx:FormItem>
+					<mx:Button label="Copy to Clipboard" click="copyToClipboard()" />
+				</mx:FormItem>
+			</mx:Form>
+		</mx:VBox>
+	</mx:Panel>
+
+</mx:Application>
