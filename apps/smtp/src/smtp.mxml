@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute"
+	creationComplete="initApp()">
+
+	<mx:Script>
+		<![CDATA[
+
+			import flash.errors.*;
+			import flash.events.*;
+			import flash.net.Socket;
+
+			import mx.managers.PopUpManager;
+			import mx.containers.TitleWindow;
+
+			internal var socket:Socket;
+			internal var SMTPServer:String = 'mail.vegas.com';
+			internal var port:uint = 25;
+
+			[Bindable]
+			public var connected:Boolean = false;
+
+			// When application has been initiated this function gets called
+			internal function initApp():void{
+				// Create an instance of flash.net.Socket
+				socket = new Socket();
+
+				// Initialise listeners
+				socket.addEventListener(Event.CONNECT, connectHandler);
+				socket.addEventListener(Event.CLOSE, closeHandler);
+				socket.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
+				socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
+				socket.addEventListener(ProgressEvent.SOCKET_DATA, socketDataHandler);
+			}
+
+		    private function closeHandler(event:Event):void {
+		        trace("closeHandler: " + event);
+		    }
+
+		    private function connectHandler(event:Event):void {
+		        trace("connectHandler: " + event);
+		    }
+
+		    private function ioErrorHandler(event:IOErrorEvent):void {
+		        trace("ioErrorHandler: " + event);
+		    }
+
+		    private function securityErrorHandler(event:SecurityErrorEvent):void {
+		        trace("securityErrorHandler: " + event);
+		    }
+
+		    private function socketDataHandler(event:ProgressEvent):void {
+		        trace("socketDataHandler: " + event);
+		        readResponse();
+		    }
+
+			private function connect():void{
+				// Connect to server and specify port number
+				socket.connect(SMTPServer, port);
+
+				submitCommand("HELO flex-mailapp");
+			}
+
+			private function sendTest():void{
+				sendMail('flex@example.com', recipient.text, mailText.text);
+			}
+
+			private function sendMail(from:String, recip:String, data:String):void{
+				//create a formatted date
+				var date:String = dateFormatter.format(new Date());
+	            //sender header
+	            submitCommand('MAIL FROM: <' + from + '>');
+	            trace('MAIL FROM: <' + from + '>');
+	            //recipient header
+	            submitCommand('RCPT TO: <' + recip + '>');
+	            trace('RCPT TO: <' + recip + '>');
+	            //start message
+	            submitCommand('DATA');
+
+				var mail:String = 'From: "nobody" <' + from + '>\r\n';
+				//mail += 'To: ' + name + ' <' + recip + '>\r\n';
+				mail += 'To: "Flex Recipient" <' + recip + '>\r\n';
+				mail += 'Subject: Test\r\n';
+				mail += 'Date: ' + date + '\r\n';
+				mail += 'X-Coder: Paul Gregoire <paul@gregoire.org>\r\n';
+				mail += 'X-Originating-IP: [127.0.0.1]\r\n';
+				mail += 'Return-Path: <' + from + '>\r\n';
+				mail += 'Content-class: urn:content-classes:message\r\n';
+				mail += '\r\n';
+				mail += data;
+				mail += '\r\n.\r\n';
+
+				submitCommand(mail);
+
+				trace(mail);
+			}
+
+			private function disconnect():void{
+				// If connected then disconnect and close the socket
+				if (socket.connected) {
+					submitCommand("QUIT");
+					socket.close();
+				}
+				connected = false;
+				serverResults.text += "Disconnected";
+			}
+
+			private function submitCommand(cmd:String):void{
+				// Create an instance of flash.utils.ByteArray
+				var command:ByteArray = new ByteArray();
+				// Write UTF string user and pass to ByteArray and terminate with \r\n
+				command.writeUTFBytes(cmd + '\r\n');
+				// Write ByteArray to socket
+				socket.writeBytes(command);
+				// Flushes any accumulated data in the socket's output buffer and sends it to the server
+				socket.flush();
+			}
+
+		    private function readResponse():void {
+		        var str:String = socket.readUTFBytes(socket.bytesAvailable);
+		        serverMessages.text += (str);
+		        //check for errors
+		        if (str.charAt() == '5') {
+		        	trace('Error from server');
+		        }
+		    }
+
+		]]>
+	</mx:Script>
+
+	<mx:DateFormatter id="dateFormatter" formatString="EEE, DD MMM YYYY HH:NN:SS"/>
+
+	<mx:Panel x="24" y="23" width="423" height="570" layout="absolute">
+		<mx:Label text="SMTP Socket Example"/>
+			<mx:Form height="530" width="403">
+				<mx:FormItem label="Messages">
+					<mx:TextArea id="serverMessages" width="250" height="150"/>
+				</mx:FormItem>
+				<mx:FormItem label="Server Results">
+					<mx:TextArea id="serverResults" width="250" height="150"/>
+				</mx:FormItem>
+				<mx:FormItem label="To">
+					<mx:TextInput id="recipient"/>
+				</mx:FormItem>
+				<mx:FormItem label="Text">
+					<mx:TextInput id="mailText"/>
+				</mx:FormItem>
+				<mx:Button label="Connect" click="connect()"/>
+				<mx:Button label="Send Test" click="sendTest()"/>
+				<mx:Button label="Disconnect" click="disconnect()"/>
+			</mx:Form>
+	</mx:Panel>
+
+</mx:Application>

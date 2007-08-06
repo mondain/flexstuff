@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute" 
+	horizontalAlign="center" verticalAlign="middle" 
+	width="10" height="10"
+	creationComplete="init();">
+	<mx:Script>
+		<![CDATA[
+       		import mx.managers.*;
+			import mx.events.*;
+			import mx.utils.*;
+			import mx.controls.*;
+			import mx.rpc.*;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.collections.*;	
+    		import flash.utils.Timer;
+    		import flash.events.TimerEvent;
+    
+    		[Bindable]
+    		private var userId:String = '0';
+    
+			private function init():void {			
+				userId=Application.application.parameters.userId;	
+            	var myTimer:Timer = new Timer(60000);
+            	myTimer.addEventListener("timer", timerHandler);
+            	myTimer.start();
+            	//initial ping
+				pingRPC.send();
+        	}
+
+        	public function timerHandler(event:TimerEvent):void {
+            	trace("timerHandler: " + event);
+            	indicator.setStyle('backgroundColor','#000000');
+				pingRPC.send();
+        	}
+
+			private function rpcHandler(event:ResultEvent):void {
+				trace('Got an RPC response: '+event.result);
+				try {
+					var pong:String = '0';
+					for each (var s:XML in event.result..pong){
+						pong = String(s);
+					}					
+					if (pong === '1') {
+						indicator.setStyle('backgroundColor','#00ff00');
+					} else if (pong === '2') {
+						indicator.setStyle('backgroundColor','#0000ff');
+						//Alert.show("You have new messages");
+					} else {
+						indicator.setStyle('backgroundColor','#ff0000');
+					}
+					trace('Target: '+event.target+' Current target: '+event.currentTarget);
+				} catch(e) {
+					
+				}
+			}
+			
+		    private function RPCfault(event:FaultEvent):void {
+		        //var faultstring:String = event.fault.faultString;
+		        //Alert.show(faultstring);
+	        	indicator.setStyle('backgroundColor','#ff0000');
+	       	}
+		]]>
+	</mx:Script>	
+
+	<!-- 5 mins worth of changes -->
+	<mx:HTTPService id="pingRPC" url="http://fb.gregoire.org/pgIM/ping.jsp?id={userId}" 
+		result="rpcHandler(event)" fault="RPCfault(event)" resultFormat="e4x" />
+	
+	<mx:Canvas id="indicator" x="0" y="0" width="10" height="10" 
+		cornerRadius="20" backgroundColor="#000000"
+		toolTip="Status: Green=Ok, Blue=You have a message, Red=Error">
+	</mx:Canvas>
+	
+</mx:Application>
